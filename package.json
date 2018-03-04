@@ -1,0 +1,14 @@
+{
+  "name": "github-staging-merge",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "octonode": "pksunkara/octonode.git#9ca50b2f6efb064af9ee7e3b8c4719fe59a5fdc9"
+  }
+}
