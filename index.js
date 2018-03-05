@@ -12,6 +12,11 @@ function mergeStaging() {
     let client = github.client(process.env.GITHUB_TOKEN);
     repos.forEach(repo => {
         createPullRequest(client, repo, 'Auto Merge Staging', 'Time: ' + Date.now(), 'staging', 'master').then(pr => {
+            if (!pr) { // if no pr is returned, like for when there are no commits between the branches
+                console.log('Could not create pull request for repo: ' + repo);
+                console.log('Possibly because there are no changes to merge');
+                return;
+            }
             getIsPRMergeable(client, repo, pr.number).then(isMergeable => {
                 if (!isMergeable) {
                     throw new Error('PULL REQUEST IS NOT MERGEABLE! Repo: ' + repo + ' PR#: ' + pr.number)
@@ -93,6 +98,10 @@ function createPullRequest(client, repo, title, body, head, base) {
             'base': base
         }, (err, data) => {
             if (err) {
+                if (!err.body || !err.body.errors) {
+                    reject(err);
+                    return
+                }
                 let fetch = err.body.errors.find(e => e.message && e.message.includes('A pull request already exists for'));
                 if (fetch) {
                     getPullRequests(client, repo).then(prs => {
@@ -105,7 +114,13 @@ function createPullRequest(client, repo, title, body, head, base) {
                         }
                     })
                 } else {
-                    reject(err)
+                    let noDiff = err.body.errors.find(e => e.message && e.message.includes('No commits between master and'));
+                    if (typeof noDiff !== 'undefined') {
+                        // no error
+                        resolve(null);
+                    } else {
+                        reject(octoNodeErrorToString(err))
+                    }
                 }
             } else {
                 resolve(data) // return the pr
@@ -147,6 +162,22 @@ function callbackToPromise(object, funcName, params = null) {
             })
         }
     })
+}
+
+function octoNodeErrorToString(err) {
+    let es = '';
+    if (err.hasOwnProperty('message')) {
+        es += 'Message: ' + err.message + ' ';
+    }
+    if (err.hasOwnProperty('errors')) {
+        err.errors.forEach((e, i) => {
+            es += 'Error' + i + ': ' + JSON.stringify(e);
+        })
+    }
+    if (err.hasOwnProperty('documentation_url')) {
+        es += ' Doc URL: ' + err.documentation_url;
+    }
+    return es;
 }
 
 exports = Object.assign(exports, {
