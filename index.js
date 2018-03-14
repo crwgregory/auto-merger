@@ -1,38 +1,45 @@
 let github = require('octonode');
 
 let repos = [
-    'crwgregory/test-auto-merge'
+    ''
 ];
 
 function handler(event, context, callback) {
-    mergeStaging()
+    mergeStaging().then(() => {
+        console.log('complete');
+        callback();
+    }).catch(e => {
+        console.error(e)
+    })
 }
 
 function mergeStaging() {
     let client = github.client(process.env.GITHUB_TOKEN);
-    repos.forEach(repo => {
-        createPullRequest(client, repo, 'Auto Merge Staging', 'Time: ' + Date.now(), 'staging', 'master').then(pr => {
-            if (!pr) { // if no pr is returned, like for when there are no commits between the branches
-                console.log('Could not create pull request for repo: ' + repo);
-                console.log('Possibly because there are no changes to merge');
-                return;
-            }
-            getIsPRMergeable(client, repo, pr.number).then(isMergeable => {
-                if (!isMergeable) {
-                    throw new Error('PULL REQUEST IS NOT MERGEABLE! Repo: ' + repo + ' PR#: ' + pr.number)
+    return Promise.all(repos.map(repo => {
+        return new Promise((resolve, reject) => {
+            createPullRequest(client, repo, 'Auto Merge Staging', 'Time: ' + Date.now(), 'staging', 'master').then(pr => {
+                if (!pr) { // if no pr is returned, like for when there are no commits between the branches
+                    console.log('Could not create pull request for repo: ' + repo + '. Possibly because there are no changes to merge');
+                    resolve();
                 }
-                merge(client, repo, pr.head.ref, 'master', 'build: automerge staging').then(sha => {
-                    console.log('merge sha', sha)
+                getIsPRMergeable(client, repo, pr.number).then(isMergeable => {
+                    if (!isMergeable) {
+                        reject(new Error('PULL REQUEST IS NOT MERGEABLE! Repo: ' + repo + ' PR#: ' + pr.number))
+                    }
+                    merge(client, repo, pr.head.ref, 'master', 'build: automerge staging').then(sha => {
+                        console.log('merge sha', sha);
+                        resolve()
+                    }).catch(e => {
+                        reject(e)
+                    })
                 }).catch(e => {
-                    throw e
+                    reject(e)
                 })
             }).catch(e => {
-                throw e
+                reject(e)
             })
-        }).catch(e => {
-            throw e
         })
-    })
+    }))
 }
 
 /**
@@ -88,7 +95,7 @@ function getPullRequest(client, repo, prNumber) {
  * @returns {Promise<object>} returns the created pr
  */
 function createPullRequest(client, repo, title, body, head, base) {
-    console.log('createPullRequest: ', repo, title, body, head, base);
+    console.log('createPullRequest(): ', repo, title, body, head, base);
     let ghrepo = client.repo(repo);
     return new Promise((resolve, reject) => {
         ghrepo.pr({

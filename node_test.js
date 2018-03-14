@@ -1,3 +1,5 @@
 let mod = require('./index');
 
-mod.mergeStaging();
+mod.handler('', '', () => {
+    console.log('callback')
+});
